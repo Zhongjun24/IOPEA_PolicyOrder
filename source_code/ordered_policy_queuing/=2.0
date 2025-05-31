@@ -1,0 +1,6 @@
+Requirement already satisfied: shimmy in /home/linuxbrew/.linuxbrew/lib/python3.10/site-packages (2.0.0)
+Requirement already satisfied: numpy>=1.18.0 in /home/linuxbrew/.linuxbrew/lib/python3.10/site-packages (from shimmy) (1.24.1)
+Requirement already satisfied: gymnasium>=1.0.0a1 in /home/linuxbrew/.linuxbrew/lib/python3.10/site-packages (from shimmy) (1.0.0)
+Requirement already satisfied: cloudpickle>=1.2.0 in /home/linuxbrew/.linuxbrew/lib/python3.10/site-packages (from gymnasium>=1.0.0a1->shimmy) (3.1.0)
+Requirement already satisfied: typing-extensions>=4.3.0 in /home/linuxbrew/.linuxbrew/lib/python3.10/site-packages (from gymnasium>=1.0.0a1->shimmy) (4.12.2)
+Requirement already satisfied: farama-notifications>=0.0.1 in /home/linuxbrew/.linuxbrew/lib/python3.10/site-packages (from gymnasium>=1.0.0a1->shimmy) (0.0.4)
