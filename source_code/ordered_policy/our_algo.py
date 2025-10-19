@@ -120,7 +120,7 @@ class InformationOrderedPolicyElimination:
         
                     current_t += 4 ** current_k * np.round((1/self.alpha_), 0)
                     current_k += 1
-                    a0, a1 = self._return_to_start(crucial_state[1], None, pipeline_state[-self.param_.hyper_set['L']:])
+                    a0, a1 = self._return_to_start(crucial_state[N_k - self.param_.hyper_set['L']], None, pipeline_state[-self.param_.hyper_set['L']:])
                     current_cost += a0 
                     current_t += a1
                     pbar.update(1)
@@ -144,7 +144,7 @@ class InformationOrderedPolicyElimination:
     
                     current_t += 4 ** current_k * np.round((1/self.alpha_), 0)
                     current_k += 1
-                    a0, a1 = self._return_to_start(crucial_state[1], shortline_state[2:2 + self.param_.hyper_set['l']], pipeline_state[-self.param_.hyper_set['L']:])
+                    a0, a1 = self._return_to_start(crucial_state[N_k - self.param_.hyper_set['L']], shortline_state[N_k - self.param_.hyper_set['L'] + 1:N_k - self.param_.hyper_set['L'] + self.param_.hyper_set['l'] + 1], pipeline_state[-self.param_.hyper_set['L']:])
                     current_cost += a0
                     current_t += a1
                     pbar.update(1)

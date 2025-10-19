@@ -15,6 +15,7 @@ import feedback_graph
 import PPO
 import PPO_gym
 import online_convex
+import InClassSGD
 import gc
 from tqdm import tqdm
 import datetime
@@ -33,6 +34,8 @@ def run_one_experiment(algo, param_copy, dynamics_copy, S, A, X, H, alpha_, seed
         exp_env = our_algo.InformationOrderedPolicyElimination(param_copy, dynamics_copy, alpha_=alpha_, seed_ = seed_)
     elif algo == 'random':
         exp_env = baselines.Random(param_copy, dynamics_copy, seed_ = seed_)
+    elif algo == 'inclass_sgd':
+        exp_env = InClassSGD.FiniteDifferenceGD(param_copy, dynamics_copy, seed_ = seed_)
     elif algo == 'optimal':
         exp_env = baselines.Optimal(param_copy, dynamics_copy, seed_)
     elif algo == 'feedback_graph':
@@ -53,7 +56,7 @@ def run_one_experiment(algo, param_copy, dynamics_copy, S, A, X, H, alpha_, seed
 
 def main():
     # Parameters
-    arg_v = sys.argv[1]
+    arg_v = sys.argv[0]
     if platform.system() != 'Darwin':
         multiprocessing.set_start_method('spawn', force = True)
     param_ = hyperparameters.HyperParameters()
@@ -125,9 +128,7 @@ def main():
             for algo in algo_names:
                 tasks = []
                 for idx in range(k):
-                    if (algo in ['optimal', 'empirical_hindsight'] and T >= 100000):
-                        continue
-                    if (algo in ['feedback_graph'] and T > 100000):
+                    if (algo in ['optimal', 'empirical_hindsight'] and T > 10000):
                         continue
                     param_copy = copy.deepcopy(param_)
                     dynamics_copy = copy.deepcopy(dynamics_)

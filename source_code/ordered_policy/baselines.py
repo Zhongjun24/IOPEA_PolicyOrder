@@ -47,7 +47,7 @@ class Random:
                 if current_t == 1:
                     temp_cost, _, shortline_state, pipeline_state, crucial_state = self.dynamics_.policy_playing(1 + self.param_.hyper_set['L'], current_policy, demands, if_initial_state = 0)
                 else:
-                    temp_cost, _, shortline_state, pipeline_state, crucial_state = self.dynamics_.policy_playing(1 + self.param_.hyper_set['L'], current_policy, demands, if_initial_state = 1, x1= crucial_state[1], x2 = shortline_state[1:1 + self.param_.hyper_set['l']], x3 = pipeline_state[-self.param_.hyper_set['L']:], boundary_checking = 0)
+                    temp_cost, _, shortline_state, pipeline_state, crucial_state = self.dynamics_.policy_playing(1 + self.param_.hyper_set['L'], current_policy, demands, if_initial_state = 1, x1= crucial_state[1], x2 = shortline_state[2:2 + self.param_.hyper_set['l']], x3 = pipeline_state[-self.param_.hyper_set['L']:], boundary_checking = 0)
                 current_cost += np.sum(temp_cost[: -self.param_.hyper_set['L']])
                 current_t += 1
             return current_cost/self.T, self.evaluation.run(current_policy)

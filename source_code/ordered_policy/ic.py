@@ -59,7 +59,7 @@ class InventoryControl:
         v = (v - self.min_cost)/(self.max_cost - self.min_cost + 1e-6)
         if boundary_checking == None:
             if v < 0 or v > 1:
-                print('cost out of range [0,1]? memory leak signal 138')
+                None#print('cost out of range [0,1]? memory leak signal 138')
         return v
 
     def denormalize_(self, results, one_seed):
@@ -93,14 +93,13 @@ class InventoryControl:
 
         rng = one_seed
         if distribution == "uniform":
-            inital_demand_sequence = rng.uniform(min_val, max_val, size)
+            inital_demand_sequence = np.random.uniform(min_val, max_val, size)
 
         elif distribution == "normal":
             mean = kwargs.get("mean", (min_val + max_val) / 2)
             std_dev = kwargs.get("std_dev", (max_val - min_val) / 6)  # Approximate rule for range
-            samples = rng.normal(mean, std_dev, size)
+            samples = np.random.normal(mean, std_dev, size)
             inital_demand_sequence = np.clip(samples, min_val, max_val)  # Ensuring values stay in range
-
 
         elif distribution == "exponential":
             scale = kwargs.get("scale", (max_val - min_val) / 3)
@@ -110,7 +109,7 @@ class InventoryControl:
         elif distribution == "beta":
             alpha = kwargs.get("alpha", 2)
             beta = kwargs.get("beta", 5)
-            samples = rng.beta(alpha, beta, size)
+            samples = np.random.beta(alpha, beta, size)
             inital_demand_sequence = min_val + samples * (max_val - min_val)  # Scale to range
 
         else:

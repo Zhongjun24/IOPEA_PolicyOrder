@@ -4,7 +4,7 @@ import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
 import my_tools
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 import torch
 from tqdm import tqdm
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -28,7 +28,6 @@ class ContinuousEnv(gym.Env):
         self.step_count = 0
         self.state = [param_.hyper_set['policy_set'][0][0]] * dimension_
 
-         
         self.rng_factory = my_tools.make_rng_factory(self.seed_)
         self.one_seed = self.rng_factory()
 
@@ -52,6 +51,13 @@ class ContinuousEnv(gym.Env):
     def reset(self):
         self.step_count = 0
         return np.array(self.state, dtype=np.float32) if self.state is not None else np.array(self.initial_state, dtype=np.float32)
+
+        '''
+        base = np.array(self.initial_state, dtype=np.float32)
+        noise = self.np_random.normal(loc=0, scale=0, size=base.shape)
+        self.state = np.clip(base + noise, self.observation_space.low, self.observation_space.high)
+        return np.array(self.state, dtype=np.float32) if self.state is not None else np.array(self.initial_state, dtype=np.float32)
+        '''
 
     def step(self, action):
         s = self.state if self.state is not None else self.initial_state
@@ -93,6 +99,16 @@ class ContinuousEnv(gym.Env):
         done = self.step_count >= self.H
         return np.array(self.state, dtype=np.float32), reward, done, {}
 
+class ActionNormWrapper(gym.ActionWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.orig_low, self.orig_high = env.action_space.low, env.action_space.high
+        # Agent “看到” [-1,1]
+        self.action_space = spaces.Box(-1., 1., shape=self.orig_low.shape, dtype=np.float32)
+
+    def action(self, a_norm):
+        # Agent 输出 a_norm ∈ [-1,1] → Env 接收 a_raw ∈ [low,high]
+        return self.orig_low + (a_norm + 1.0) * 0.5 * (self.orig_high - self.orig_low)
 
 class PPOTrainer:
     def __init__(self, env_class, param_, dynamics_, S_box, A_box, dimension_, H, seed_=0):
@@ -105,88 +121,79 @@ class PPOTrainer:
         self.seed_ = seed_
         self.best_params = None
 
-    def tune_hyperparameters(self, n_trials=10, timeout=None):
-        def objective(trial):
-            lr = trial.suggest_loguniform('learning_rate', 1e-5, 1e-2)
-            n_steps = trial.suggest_categorical('n_steps', [64, 128, 256, 512])
-            batch_size = trial.suggest_categorical('batch_size', [16, 32, 64, 128])
-            gamma = trial.suggest_uniform('gamma', 0.90, 0.9999)
-            ent_coef = trial.suggest_loguniform('ent_coef', 1e-8, 1e-2)
+        self.n_envs = 8
 
-            vec_env = DummyVecEnv([self.env_fn])
-            model = PPO(
-                "MlpPolicy", vec_env,
-                learning_rate=lr,
-                n_steps=n_steps,
-                batch_size=batch_size,
-                gamma=gamma,
-                ent_coef=ent_coef,
-                verbose=0,
-                device='cpu'
-            )
+    def run(self, total_timesteps=None, tune=True):
+        # 调参略...
+        # 1) 构造训练环境：ActionNorm + VecNormalize + DummyVecEnv
+        def make_env():
+            return ActionNormWrapper(self.env_fn())
+        vec_env = DummyVecEnv([make_env for _ in range(self.n_envs)])
+        vec_env = VecNormalize(vec_env,
+                               norm_obs=True, norm_reward=True,
+                               clip_obs=10.0, clip_reward=10.0)
 
-            model.learn(total_timesteps=int(1e4))
-
-            eval_env = self.env_fn()
-            mean_reward, _ = evaluate_policy(model, eval_env, 
-                                             n_eval_episodes=10,
-                                             deterministic=True)
-            return mean_reward
-
-        study = optuna.create_study(direction='maximize')
-        study.optimize(objective, n_trials=n_trials, timeout=timeout)
-
-        self.best_params = study.best_params
-        #print("Best hyperparameters:", self.best_params)
-
-    def run(self, total_timesteps=None, model_path="ppo_model", tune=True):
-        if tune:
-            self.tune_hyperparameters()
-
-        hp = self.best_params or {
-            'learning_rate': 1e-3,
-            'n_steps': 100,
-            'batch_size': 32,
-            'gamma': 0.999,
-            'ent_coef': 1e-4
-        }
-
-        total_timesteps = self.dynamics_.time_horizon
-        vec_env = DummyVecEnv([self.env_fn])
-        policy_kwargs = dict(net_arch=[256, 256, 128],activation_fn=nn.ReLU)
-        model = PPO(
-            "MlpPolicy", vec_env,
-            policy_kwargs=policy_kwargs,
-            learning_rate=hp['learning_rate'],
-            n_steps=hp['n_steps'],
-            batch_size=hp['batch_size'],
-            gamma=hp['gamma'],
-            ent_coef=hp['ent_coef'],
-            verbose=0,
-            device='cpu'
+        policy_kwargs = dict(
+            net_arch=[256,256,128,128,64,64],
+            activation_fn=nn.ReLU,
+            log_std_init=np.log(0.1)  # 初始 σ≈100
         )
+        model = PPO("MlpPolicy", vec_env,
+                    policy_kwargs=policy_kwargs,
+                    learning_rate=1e-4,
+                    n_steps=512,
+                    batch_size=32,
+                    gamma=0.9,
+                    ent_coef=1e-4,
+                    verbose=1, device='cpu')
 
-        model.learn(total_timesteps=total_timesteps)
-        return self.evaluate(model)
+        model.learn(total_timesteps=int(self.dynamics_.time_horizon))
 
-    def evaluate(self, model):
-        print('===PPO: evaluation===')
-        env = self.env_fn()
-        state = env.initial_state
+        # 2) 评估：手写循环，保留包装，逐步打印
+        print("=== PPO: manual evaluation ===")
+
+        def make_eval_env():
+            # self.env_fn() 返回一个 ContinuousEnv 实例
+            return ActionNormWrapper(self.env_fn())
+
+        # 2. 用 DummyVecEnv 把它变成 VecEnv（内部有 num_envs=1）
+        eval_vec_env = DummyVecEnv([make_eval_env])
+
+        # 3. 套上 VecNormalize，做 obs/reward 归一化
+        eval_vec_env = VecNormalize(
+            eval_vec_env,
+            norm_obs=True,
+            norm_reward=True,
+            clip_obs=10.0,
+            clip_reward=10.0
+        )
+        # 评估时不再更新统计量
+        eval_vec_env.training    = False
+        eval_vec_env.norm_reward = False
+
+        # 4. 手写评估循环
+        obs_batch = eval_vec_env.reset()  # 返回 shape (1, obs_dim)
         total_cost = 0
-        steps = 0
+        for i in range(self.param_.testing_horizon):
+            # 传入 batch
+            a_norm_batch, _ = model.predict(obs_batch, deterministic=True)
+            # a_norm_batch.shape == (1, action_dim)
+            
+            next_obs_batch, r_norm_batch, done_batch, infos = eval_vec_env.step(a_norm_batch)
+            # 都是 batch 形式，需要取第 0 个元素
+            obs = next_obs_batch[0]
+            r_norm = r_norm_batch[0]
+            total_cost += 1 - r_norm
+            done = done_batch[0]
+            info = infos[0]
 
-        model.policy.eval()
-        with torch.no_grad():
-            with tqdm(total=self.param_.testing_horizon, desc="Running", unit="step") as pbar:
-                while steps < self.param_.testing_horizon:
-                    action, _ = model.predict(state, deterministic=True)
-                    next_state, reward, _, _ = env.step(action)
-                    total_cost += (1 - reward)
-                    state = next_state
-                    steps += 1
-                    pbar.update(1)
+            # 如果想看原始 env 的内部状态和映射后的动作：
+            raw_env = eval_vec_env.venv.envs[0]        # 拿到你的 ContinuousEnv
+            raw_state = raw_env.state                 # 它的内部 state
+            low, high = raw_env.action_space.low, raw_env.action_space.high
+            a_raw = low + (a_norm_batch[0] + 1.0) * 0.5 * (high - low)
+            obs_batch = next_obs_batch
 
-        avg_cost = total_cost / (steps + 1e-6)
+        avg_cost = total_cost / (i + 1e-6)
         print(f"Average evaluation cost: {avg_cost:.4f}")
         return avg_cost, avg_cost

@@ -11,10 +11,11 @@ class HyperParameters:
 			self.hyper_set = self._dual_index_setting()
 		if self.current_problem == 'M1L':
 			self.hyper_set = self._M1L()
-		#self.hyper_algo_set = ['our_algo', 'random', 'PPO', 'heuristic', 'optimal', 'feedback_graph', 'empirical_hindsight']
-		self.hyper_algo_set = ['our_algo', 'random', 'PPO', 'heuristic', 'optimal', 'feedback_graph', 'empirical_hindsight']
+		#self.hyper_algo_set = ['our_algo', 'random', 'inclass_sgd', 'PPO', 'heuristic', 'optimal', 'feedback_graph', 'empirical_hindsight']
+		self.hyper_algo_set = ['inclass_sgd']
 
-		self.time_horizon_list = [100,1000,10000,100000]
+		self.time_horizon_list = [100,1000,10000,100000,300000,500000,1000000]
+		#self.time_horizon_list = [1000000]
 		self.testing_horizon = 100000
 		self.exp_repeat_times = 20
 		self.testing_flag = 1
@@ -40,8 +41,8 @@ class HyperParameters:
 
 
 	def _inventory_problem_setting(self):
-		val_dic = {'policy_set': [[0, 300]],
-			'time_horizon': 100000,
+		val_dic = {'policy_set': [[0, 250]],
+			'time_horizon': 10000,
 			'holding_cost': 1,
 			'shortage_penalty': 10, 
 			'purchasing_cost': 0, 
@@ -56,8 +57,8 @@ class HyperParameters:
 		return val_dic
 
 	def _dual_index_setting(self):
-		val_dic = {'policy_set': [[0, 6], [0, 6]], #[[short-term base-stock levels], [long-term base-stock levels]]
-			'time_horizon': 10000,
+		val_dic = {'policy_set': [[0, 8], [0, 8]], #[[short-term base-stock levels], [long-term base-stock levels]]
+			'time_horizon': 100000,
 			'holding_cost': 1,
 			'shortage_penalty': 10, 
 			'purchasing_cost': 0, 
